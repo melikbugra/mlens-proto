@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package mlens.v1;
+
+import "mlens_proto/common.proto";
+
+// Minimal experiment metadata.
+message ExperimentMeta {
+  string experiment_id = 1;
+  string name = 2;
+  int64 created_at = 3; // epoch seconds
+}
+
+// Minimal run metadata.
+message RunMeta {
+  string experiment_id = 1;
+  string run_id = 2;
+  string name = 3;
+  repeated Param params = 4; // optional static parameters
+  int64 created_at = 5; // epoch seconds
+}

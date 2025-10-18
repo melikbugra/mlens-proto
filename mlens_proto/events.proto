@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package mlens.v1;
+
+import "mlens_proto/common.proto";
+
+// A single append-only event associated with a run (minimal version).
+message RunEvent {
+  string experiment_id = 1;
+  string run_id = 2;
+  uint64 seq = 3;         // monotonically increasing per-run
+  int64 timestamp = 4;    // epoch seconds
+
+  oneof payload {
+    ParamSet param_set = 10;  // set/update a parameter
+    MetricUpdate metric = 11; // update a metric
+  }
+}
+
+message ParamSet {
+  Param param = 1;
+}
+
+message MetricUpdate {
+  string metric_name = 1;
+  MetricPoint point = 2;
+}
