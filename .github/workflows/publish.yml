@@ -1,0 +1,117 @@
+name: QA Build and Publish (develop)
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  qa-release:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    environment: testpypi
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup Node (for version bump)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install standard-version
+        run: npm i -D standard-version jq
+
+      - name: Bump version (no tag) and update pyproject
+        run: |
+          npx standard-version --skip.changelog --skip.tag
+          NEWVER=$(jq -r .version package.json)
+          echo "New version: $NEWVER"
+          # Update version in pyproject.toml safely (no unescaped quotes)
+          sed -E -i 's/^version[[:space:]]*=[[:space:]]*".*"/version = "'"${NEWVER}"'"/' pyproject.toml
+          git add package.json pyproject.toml
+          git commit --amend --no-edit
+          git push origin HEAD:develop
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install build grpcio-tools protobuf
+
+      - name: Generate Python protos
+        run: |
+          python -m grpc_tools.protoc \
+            -I . \
+            --python_out=src \
+            mlens_proto/*.proto
+
+      - name: Build Python package
+        run: python -m build
+
+      - name: Publish to TestPyPI (Trusted Publisher)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Set up Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Node deps (build)
+        run: |
+          npm install --no-audit --no-fund
+          # Ensure required dev deps are present (idempotent)
+          npm i -D ts-proto protobufjs typescript
+
+      - name: Generate TS protos
+        run: |
+          export PATH="$(pwd)/node_modules/.bin:$PATH"
+          echo "PATH updated with: $(pwd)/node_modules/.bin"
+          ls -la "$(pwd)/node_modules/.bin" || true
+          which protoc || true
+          which protoc-gen-ts_proto || true
+          npm -v || true
+          node -v || true
+          protoc --version || true
+          echo "Repo root: $(pwd)"
+          echo "Listing mlens_proto:" && ls -la mlens_proto || true
+          mkdir -p src/gen
+          protoc \
+            -I . \
+            --plugin=protoc-gen-ts_proto=$(pwd)/node_modules/.bin/protoc-gen-ts_proto \
+            --ts_proto_out=src/gen \
+            --ts_proto_opt=esModuleInterop=true,outputServices=none,env=node \
+            mlens_proto/*.proto
+
+      - name: Build TS package
+        run: npm run build
+
+      - name: Publish to npmjs (QA, dist-tag next)
+        if: env.NPM_TOKEN != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --tag next

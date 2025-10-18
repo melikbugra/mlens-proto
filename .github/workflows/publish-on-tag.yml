@@ -1,0 +1,127 @@
+name: Release (tag & publish) on main
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release_and_publish:
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          registry-url: "https://registry.npmjs.org"
+          scope: "@melikbugra"
+
+      - name: Configure npm for CI
+        run: |
+          echo "always-auth=true" >> ~/.npmrc
+          echo "@melikbugra:registry=https://registry.npmjs.org" >> ~/.npmrc
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read version from package.json
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION}"
+          echo "Tag    : v${VERSION}"
+
+      - name: Prepare TS output directory
+        run: mkdir -p src/gen
+
+      - name: Check if tag exists
+        id: tagcheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.ver.outputs.tag }}"
+          git fetch --tags --quiet
+          if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG already exists."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG does not exist; will create."
+          fi
+
+      - name: Create & push tag (if missing)
+        if: steps.tagcheck.outputs.exists == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name  "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag -a "${{ steps.ver.outputs.tag }}" -m "Release ${{ steps.ver.outputs.tag }}"
+          git push origin "${{ steps.ver.outputs.tag }}"
+
+      - name: Create GitHub Release (optional)
+        if: steps.tagcheck.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure Node dev deps (ts-proto, typescript, protobufjs)
+        run: |
+          npm install --no-audit --no-fund
+          npm i -D ts-proto protobufjs typescript
+
+      - name: Generate TypeScript from proto (ts-proto)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$(pwd)/node_modules/.bin:$PATH"
+          mkdir -p src/gen
+          protoc \
+            -I . \
+            --plugin=protoc-gen-ts_proto=$(pwd)/node_modules/.bin/protoc-gen-ts_proto \
+            --ts_proto_out=src/gen \
+            --ts_proto_opt=esModuleInterop=true,outputServices=none,env=node \
+            mlens_proto/*.proto
+
+      - name: Build package
+        run: npm run build
+
+      - name: npm whoami (debug)
+        if: env.NPM_TOKEN != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "registry: $(npm config get registry)"
+          npm whoami
+
+      - name: Publish to npm (latest)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public

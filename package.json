@@ -1,0 +1,43 @@
+{
+	"name": "@melikbugra/mlens-proto",
+	"version": "1.0.0",
+	"description": "MLens Protobuf schemas generated TypeScript package",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"gen:ts": "protoc -I . --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=src/gen --ts_proto_opt=esModuleInterop=true,outputServices=none,env=node mlens_proto/*.proto",
+		"prepublishOnly": "npm run build"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/melikbugra/mlens-proto.git"
+	},
+	"homepage": "https://github.com/melikbugra/mlens-proto#readme",
+	"bugs": {
+		"url": "https://github.com/melikbugra/mlens-proto/issues"
+	},
+	"keywords": [
+		"ml",
+		"protobuf",
+		"schema",
+		"mlops",
+		"mlens"
+	],
+	"author": "melikbugra",
+	"license": "MIT",
+	"devDependencies": {
+		"jq": "^1.7.2",
+		"protobufjs": "^7.2.5",
+		"standard-version": "^9.5.0",
+		"ts-proto": "^1.169.0",
+		"typescript": "^5.6.3"
+	}
+}

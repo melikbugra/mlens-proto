@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package mlens.v1;
+
+// Minimal parameter: string key/value for simplicity.
+message Param {
+  string key = 1;
+  string value = 2;
+}
+
+// Minimal scalar metric point.
+message MetricPoint {
+  int64 step = 1;        // optional step/epoch index
+  int64 timestamp = 2;   // unix epoch seconds
+  double value = 3;      // metric value
+}
