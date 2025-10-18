@@ -1,27 +1,24 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "mlens-proto"
-version = "1.0.0"
-description = "MLens Protobuf schemas generated Python package"
+version = "1.1.0"
+description = "MLens Protobuf Definitions"
+authors = ["melikbugra <melik@melikbugraozcelik.com>"]
+license = "MIT"
 readme = "README.md"
-requires-python = ">=3.8"
-license = { text = "MIT" }
-authors = [{ name = "MLens" }]
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-]
+homepage = "https://mlens.melikbugraozcelik.com"
 
-[project.urls]
-Homepage = "https://example.com"
+[tool.poetry.urls]
+Author = "https://melikbugraozcelik.com"
 
-[tool.setuptools]
-package-dir = { "" = "src" }
+[tool.poetry.dependencies]
+python = ">=3.11"
+protobuf = "^3.20"
+mypy-protobuf = "^3.3.0"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["mlens_proto*"]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.15.0"

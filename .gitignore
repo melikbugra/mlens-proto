@@ -1,8 +1,7 @@
 ## Generated protobuf/ts-proto code (do not commit)
-src/gen/
-src/mlens_proto/*_pb2.py
-src/mlens_proto/*_pb2.pyi
-src/mlens_proto/__pycache__/
+mlens_proto/*.py
+mlens_proto/*.pyi
+mlens_proto/*.js
 
 node_modules/
 *.egg-info/
